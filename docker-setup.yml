@@ -67,3 +67,19 @@
         restart_policy: always
         ports:
           - "80:80"
+
+   - name: Install iptables-persistent
+      apt:
+        name: iptables-persistent
+        state: present
+
+    - name: Allow port 80 through DOCKER-USER chain
+      iptables:
+        chain: DOCKER-USER
+        protocol: tcp
+        destination_port: '80'
+        jump: ACCEPT
+        action: insert
+
+    - name: Save iptables rules persistently
+      command: netfilter-persistent save
