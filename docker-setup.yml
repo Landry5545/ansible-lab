@@ -2,7 +2,6 @@
 - name: Install Docker and deploy test container
   hosts: managed
   become: yes
-
   tasks:
     - name: Install prerequisite packages
       apt:
@@ -68,7 +67,7 @@
         ports:
           - "80:80"
 
-   - name: Install iptables-persistent
+    - name: Install iptables-persistent
       apt:
         name: iptables-persistent
         state: present
