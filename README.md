@@ -92,7 +92,75 @@ reach `server-vm` but not the internet. Fixed by:
 After these fixes, `ansible-playbook -i inventory.ini setup.yml` completed
 with `ok=6, changed=2, failed=0`.
 
+## Playbook: `docker-setup.yml` (Project 8)
+
+Installs Docker Engine + Compose, deploys an nginx test container, and
+closes a real security gap where Docker silently bypasses UFW rules.
+
+### What it does
+- Installs Docker CE, CLI, containerd, and the Compose plugin
+- Enables and starts the Docker service
+- Adds the managed-node user to the `docker` group
+- Deploys an `nginx:latest` container published on port 80
+- Locks down port 80 properly via the `DOCKER-USER` iptables chain
+  (see Troubleshooting below for why this matters)
+- Installs `iptables-persistent` so the rule survives reboots
+
+### Running it
+```bash
+cd ~/ansible-lab
+ansible-playbook -i inventory.ini docker-setup.yml
+```
+
+## Troubleshooting Log — Project 8
+
+**1. DNS failure on `client-vm`'s NAT adapter**
+`apt` timed out repeatedly with `Failed to update apt cache after 5
+retries`. Root cause: the NAT adapter's DHCP-provided DNS server
+(`192.168.1.1`, the host's LAN router) isn't reachable from inside the
+VM's isolated NAT network. Fixed by hardcoding public DNS servers
+(`8.8.8.8`, `1.1.1.1`) in `/etc/netplan/50-cloud-init.yaml` for `enp0s8`.
+
+**2. Docker repo unavailable for a brand-new Ubuntu release**
+Once DNS worked, `apt-cache policy docker-ce` showed no candidate.
+`lsb_release -cs` returned `resolute` (Ubuntu 26.04), and Docker's
+official repo hadn't published packages for that codename yet. Fixed by
+hardcoding the repo to `noble` (24.04) instead of templating on
+`{{ ansible_distribution_release }}` — Docker's `.deb` packages are
+compatible across adjacent LTS/interim releases.
+
+**3. Architecture mismatch in the repo line**
+Even after fixing the codename, `docker-ce` still showed no candidate.
+Root cause: `{{ ansible_architecture }}` resolves to `x86_64` on Ubuntu,
+but Docker's repo structure expects `amd64`. Fixed by hardcoding
+`arch=amd64` in the repo definition instead of templating it.
+
+**4. YAML indentation error**
+A block of new tasks was indented at a different level than the rest of
+the `tasks:` list, causing `While parsing a block mapping did not find
+expected key`. Fixed by aligning all task-level `- name:` entries to the
+same indentation.
+
+**5. Docker silently bypasses UFW**
+After deployment, `ufw status` showed port 80 allowed — but setting it to
+**deny** had no effect; `curl localhost:80` still succeeded. Root cause:
+Docker manages its own iptables rules in the `DOCKER` chain, which are
+evaluated *before* UFW's chain, so UFW's allow/deny state is cosmetic for
+published container ports. Verified by:
+```bash
+sudo ufw deny 80/tcp
+curl localhost:80   # still succeeded — confirms the bypass
+```
+Fixed properly by inserting an explicit rule into the `DOCKER-USER` chain
+(which Docker guarantees is evaluated first) and persisting it with
+`iptables-persistent`:
+```bash
+sudo iptables -I DOCKER-USER -p tcp --dport 80 -j ACCEPT
+sudo netfilter-persistent save
+```
+This is now automated in `docker-setup.yml` rather than a manual step.
+
 ## Next Steps
 
-- Advanced playbook: install Docker, configure UFW rules
 - Expand inventory as more managed nodes are added
+- Consider a reverse-proxy playbook building on the Docker setup
