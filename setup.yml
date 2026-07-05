@@ -1,0 +1,31 @@
+---
+- name: Basic server setup
+  hosts: managed
+  become: yes
+
+  tasks:
+    - name: Install useful tools
+      apt:
+        name:
+          - curl
+          - net-tools
+        state: present
+        update_cache: yes
+
+    - name: Ensure UFW is installed
+      apt:
+        name: ufw
+        state: present
+
+    - name: Allow SSH through UFW
+      ufw:
+        rule: allow
+        name: OpenSSH
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+    - name: Print success message
+      debug:
+        msg: "Server setup complete on {{ inventory_hostname }}"
