@@ -63,6 +63,42 @@ cd ~/ansible-lab
 ansible-playbook -i inventory.ini setup.yml
 ```
 
+## Architecture — Project 8
+
+​```mermaid
+flowchart TB
+    subgraph Host["Windows Host"]
+        subgraph VBox["VirtualBox"]
+            subgraph ServerVM["server-vm (Ansible Control Node)<br/>10.10.10.10"]
+                Ansible["Ansible 2.20.1"]
+            end
+
+            subgraph ClientVM["client-vm (Managed Node)<br/>10.10.10.20"]
+                UFW["UFW<br/>allow 80/tcp"]
+                DockerUser["iptables DOCKER-USER chain<br/>ACCEPT tcp dpt:80"]
+                DockerChain["iptables DOCKER chain<br/>(Docker-managed)"]
+                Container["Docker Container<br/>test-nginx : 80"]
+                
+                UFW -.->|"evaluated first,\nbut bypassed for\npublished ports"| DockerUser
+                DockerUser -->|"must ACCEPT\nbefore Docker's\nown chain runs"| DockerChain
+                DockerChain --> Container
+            end
+
+            Labnet(["labnet<br/>Internal Network<br/>10.10.10.0/24"])
+            NAT(["NAT Adapter<br/>enp0s8"])
+
+            ServerVM ---|SSH, Ansible| Labnet
+            Labnet --- ClientVM
+            ClientVM --- NAT
+        end
+    end
+
+    NAT --> Internet(["Internet<br/>apt, Docker Hub"])
+
+    style DockerUser fill:#2d5f2d,stroke:#4ade80,color:#fff
+    style UFW fill:#5f2d2d,stroke:#ef4444,color:#fff
+​```
+
 ## Troubleshooting Log
 
 Three real issues came up bringing this playbook from draft to a clean run:
