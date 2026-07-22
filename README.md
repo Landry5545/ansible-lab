@@ -3,6 +3,14 @@
 Automated baseline configuration of `client-vm` using Ansible, run from a
 control node (`server-vm`) over SSH.
 
+## Network Topology
+
+This project builds on the shared lab network topology established in
+[linux-networking-lab](https://github.com/Landry5545/linux-networking-lab#network-topology).
+`server-vm` and `client-vm` communicate over the internal `labnet`
+network, with NAT adapters providing internet access independently on
+each VM.
+
 ## Architecture
 
 - **Control node:** `server-vm` (10.10.10.10) — Ansible 2.20.1
