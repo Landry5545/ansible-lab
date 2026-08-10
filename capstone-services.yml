@@ -4,14 +4,17 @@
   become: yes
 
   tasks:
-    - name: Check host has minimum required memory (4096 MB)
+    - name: Check host has minimum required memory (3072 MB)
       assert:
-        that: ansible_memtotal_mb >= 4096
+        that: ansible_memtotal_mb >= 3072
         fail_msg: >
           This host has {{ ansible_memtotal_mb }}MB RAM. The capstone stack
           (5 app containers + full monitoring stack) requires at least
-          4096MB. See audit/day10-incident-memory-pressure.md for why this
-          check exists — undersized VMs cause intermittent 502s under load,
+          3072MB usable RAM (VirtualBox allocations of ~4096MB typically
+          appear as ~3300MB inside the guest OS due to firmware/kernel
+          overhead — see audit/day11-memory-threshold-correction.md).
+          See audit/day10-incident-memory-pressure.md for why this check
+          exists — undersized VMs cause intermittent 502s under load,
           not a clean failure at deploy time.
         success_msg: "Memory check passed: {{ ansible_memtotal_mb }}MB available"
 
