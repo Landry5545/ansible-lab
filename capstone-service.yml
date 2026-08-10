@@ -1,0 +1,98 @@
+---
+- name: Deploy capstone internal services (Wiki.js, Snipe-IT, Uptime Kuma)
+  hosts: managed
+  become: yes
+
+  tasks:
+    - name: Check host has minimum required memory (4096 MB)
+      assert:
+        that: ansible_memtotal_mb >= 4096
+        fail_msg: >
+          This host has {{ ansible_memtotal_mb }}MB RAM. The capstone stack
+          (5 app containers + full monitoring stack) requires at least
+          4096MB. See audit/day10-incident-memory-pressure.md for why this
+          check exists — undersized VMs cause intermittent 502s under load,
+          not a clean failure at deploy time.
+        success_msg: "Memory check passed: {{ ansible_memtotal_mb }}MB available"
+
+    - name: Ensure target directory exists for capstone compose files
+      file:
+        path: /home/{{ ansible_user }}/capstone-infrastructure-platform
+        state: directory
+        owner: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Copy docker-compose.yml for capstone services
+      copy:
+        src: files/docker-compose.yml
+        dest: /home/{{ ansible_user }}/capstone-infrastructure-platform/docker-compose.yml
+        owner: "{{ ansible_user }}"
+        mode: '0644'
+
+    - name: Copy .env file for capstone services
+      copy:
+        src: files/.env
+        dest: /home/{{ ansible_user }}/capstone-infrastructure-platform/.env
+        owner: "{{ ansible_user }}"
+        mode: '0600'
+
+    - name: Bring up capstone services via Docker Compose
+      command: docker compose up -d
+      args:
+        chdir: /home/{{ ansible_user }}/capstone-infrastructure-platform
+
+    - name: Copy Nginx site config for Wiki.js
+      copy:
+        src: files/nginx/wiki.lab.local.conf
+        dest: /etc/nginx/sites-available/wiki.lab.local
+        mode: '0644'
+      notify: Reload nginx
+
+    - name: Copy Nginx site config for Snipe-IT
+      copy:
+        src: files/nginx/assets.lab.local.conf
+        dest: /etc/nginx/sites-available/assets.lab.local
+        mode: '0644'
+      notify: Reload nginx
+
+    - name: Copy Nginx site config for Uptime Kuma
+      copy:
+        src: files/nginx/status.lab.local.conf
+        dest: /etc/nginx/sites-available/status.lab.local
+        mode: '0644'
+      notify: Reload nginx
+
+    - name: Symlink Nginx sites into sites-enabled
+      file:
+        src: /etc/nginx/sites-available/{{ item }}
+        dest: /etc/nginx/sites-enabled/{{ item }}
+        state: link
+      loop:
+        - wiki.lab.local
+        - assets.lab.local
+        - status.lab.local
+      notify: Reload nginx
+
+    - name: Copy BIND9 zone file with capstone A records
+      copy:
+        src: files/bind9/db.lab.local
+        dest: /etc/bind/db.lab.local
+        owner: bind
+        group: bind
+        mode: '0644'
+      notify: Reload bind9
+
+    - name: Allow HTTP through UFW
+      ufw:
+        rule: allow
+        port: '80'
+        proto: tcp
+
+  handlers:
+    - name: Reload nginx
+      command: nginx -t && systemctl reload nginx
+
+    - name: Reload bind9
+      systemd:
+        name: bind9
+        state: reloaded
