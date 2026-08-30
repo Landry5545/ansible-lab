@@ -1,0 +1,16 @@
+name: Deploy Capstone Services
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'capstone-services.yml'
+      - 'inventory.ini'
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Ansible Playbook
+        run: ansible-playbook -i inventory.ini capstone-services.yml
