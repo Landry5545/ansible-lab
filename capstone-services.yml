@@ -100,3 +100,4 @@
         name: bind9
         state: reloaded
 # CI/CD trigger test - Day 12
+# retry with client-vm2 up and host RAM freed
