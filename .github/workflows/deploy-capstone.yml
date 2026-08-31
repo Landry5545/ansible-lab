@@ -12,5 +12,14 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
+      - name: Write .env from secrets
+        run: |
+          cat > files/.env << EOF
+          SNIPEIT_DB_PASSWORD=${{ secrets.SNIPEIT_DB_PASSWORD }}
+          SNIPEIT_DB_ROOT_PASSWORD=${{ secrets.SNIPEIT_DB_ROOT_PASSWORD }}
+          SNIPEIT_APP_KEY=${{ secrets.SNIPEIT_APP_KEY }}
+          SNIPEIT_APP_URL=${{ secrets.SNIPEIT_APP_URL }}
+          WIKIJS_DB_PASSWORD=${[ secrets.WIKIJS_DB_PASSWORD }}
+          EOF
       - name: Run Ansible Playbook
         run: ansible-playbook -i inventory.ini capstone-services.yml
